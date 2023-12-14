@@ -544,8 +544,8 @@ void SimulateNet(NET* Net, REAL* Input, REAL* Output, REAL* Target, BOOL Trainin
 
   ComputeOutputError(Net, Target);
   if (Training) {
-    BackpropagateNetCUDA(Net);
-    AdjustWeightsNetCUDA(Net);
+    BackpropagateNetCUDA(Net,d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
+    AdjustWeightsNetCUDA(Net,d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
   }
 }
 
