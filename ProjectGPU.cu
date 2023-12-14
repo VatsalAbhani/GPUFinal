@@ -634,16 +634,16 @@ REAL* h_weights = (REAL*)malloc(sizeof(REAL) * numElements1);
 REAL* h_dWeights = (REAL*)malloc(sizeof(REAL) * numElements1);
 
 
-cudaMalloc((void**)&d_lowerOutput, sizeof(float) * numElements1);
-cudaMalloc((void**)&d_upperError, sizeof(float) * numElements2);
-cudaMalloc((void**)&d_weights, sizeof(float) * numElements3);
-cudaMalloc((void**)&d_dWeights, sizeof(float) * numElements4);
+cudaMalloc((void**)&d_lowerOutput, sizeof(REAL) * numElements1);
+cudaMalloc((void**)&d_upperError, sizeof(REAL) * numElements2);
+cudaMalloc((void**)&d_weights, sizeof(REAL) * numElements3);
+cudaMalloc((void**)&d_dWeights, sizeof(REAL) * numElements4);
 
 // Copy data from host to device if necessary
-cudaMemcpy(d_lowerOutput, h_lowerOutput, sizeof(float) * numElements1, cudaMemcpyHostToDevice);
-cudaMemcpy(d_upperError, h_upperError, sizeof(float) * numElements2, cudaMemcpyHostToDevice);
-cudaMemcpy(d_weights, h_weights, sizeof(float) * numElements3, cudaMemcpyHostToDevice);
-cudaMemcpy(d_dWeights, h_dWeights, sizeof(float) * numElements4, cudaMemcpyHostToDevice); 
+cudaMemcpy(d_lowerOutput, h_lowerOutput, sizeof(REAL) * numElements1, cudaMemcpyHostToDevice);
+cudaMemcpy(d_upperError, h_upperError, sizeof(REAL) * numElements2, cudaMemcpyHostToDevice);
+cudaMemcpy(d_weights, h_weights, sizeof(REAL) * numElements3, cudaMemcpyHostToDevice);
+cudaMemcpy(d_dWeights, h_dWeights, sizeof(REAL) * numElements4, cudaMemcpyHostToDevice); 
 
 
 
