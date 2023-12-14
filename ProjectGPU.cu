@@ -651,7 +651,7 @@ void EvaluateNet(NET* Net)
  ******************************************************************************/
 
 
-int main()
+void main()
 {
   NET  Net;
   BOOL Stop;
@@ -683,5 +683,5 @@ int main()
   EvaluateNet(&Net);
 
   FinalizeApplication(&Net);
-  return 0;
+//   return 0;
 }
