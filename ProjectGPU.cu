@@ -340,7 +340,7 @@ __global__ void PropagateLayerKernel(double *lowerOutput, double *upperWeights, 
 
 // Modified PropagateLayer function to use CUDA
 void PropagateLayerCUDA(NET* Net, LAYER* Lower, LAYER* Upper) {
-    double *d_LowerOutput, *d_UpperWeights, *d_UpperOutput;
+    REAL *d_LowerOutput, *d_UpperWeights, *d_UpperOutput;
 
     cudaMalloc(&d_LowerOutput, sizeof(double) * (Lower->Units + 1));
     cudaMalloc(&d_UpperWeights, sizeof(double) * (Upper->Units + 1) * (Lower->Units + 1));
