@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <cuda_runtime.h>
 
 
 typedef int           BOOL;
@@ -323,48 +324,108 @@ void RestoreWeights(NET* Net)
 
 
 // CUDA Kernel for PropagateLayer
-__device__ void PropagateLayerKernel(double *lowerOutput, double *upperWeights, double *upperOutput, int lowerUnits, int upperUnits, double gain) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < upperUnits) {
-        double sum = 0.0;
-        for (int j = 0; j <= lowerUnits; j++) {
-            sum += upperWeights[idx * (lowerUnits + 1) + j] * lowerOutput[j];
+// __global__ void PropagateLayerKernel(double *lowerOutput, double *upperWeights, double *upperOutput, int lowerUnits, int upperUnits, double gain) {
+//     int idx = blockIdx.x * blockDim.x + threadIdx.x;
+//     if (idx < upperUnits) {
+//         double sum = 0.0;
+//         for (int j = 0; j <= lowerUnits; j++) {
+//             sum += upperWeights[idx * (lowerUnits + 1) + j] * lowerOutput[j];
+            
+//         }
+//         upperOutput[idx] = 1 / (1 + exp(-gain * sum));
+//     }
+// } 
+
+
+
+// // Modified PropagateLayer function to use CUDA
+// void PropagateLayerCUDA(NET* Net, LAYER* Lower, LAYER* Upper) {
+//     double *d_LowerOutput, *d_UpperWeights, *d_UpperOutput;
+
+//     cudaMalloc(&d_LowerOutput, sizeof(double) * (Lower->Units + 1));
+//     cudaMalloc(&d_UpperWeights, sizeof(double) * (Upper->Units + 1) * (Lower->Units + 1));
+//     cudaMalloc(&d_UpperOutput, sizeof(double) * (Upper->Units + 1));
+
+//     cudaMemcpy(d_LowerOutput, Lower->Output, sizeof(double) * (Lower->Units + 1), cudaMemcpyHostToDevice);
+//     cudaMemcpy(d_UpperWeights, Upper->Weight[0], sizeof(double) * (Upper->Units + 1) * (Lower->Units + 1), cudaMemcpyHostToDevice);
+
+//     int blockSize = 256;
+//     int numBlocks = (Upper->Units + blockSize - 1) / blockSize;
+//     PropagateLayerKernel<<<numBlocks, blockSize>>>(d_LowerOutput, d_UpperWeights, d_UpperOutput, Lower->Units, Upper->Units, Net->Gain);
+
+//     cudaMemcpy(Upper->Output, d_UpperOutput, sizeof(double) * (Upper->Units + 1), cudaMemcpyDeviceToHost);
+
+//     cudaFree(d_LowerOutput);
+//     cudaFree(d_UpperWeights);
+//     cudaFree(d_UpperOutput);
+// }
+
+
+// // Modified PropagateNet function to use the CUDA version of PropagateLayer
+// void PropagateNetCUDA(NET* Net) {
+//     for (int l = 0; l < NUM_LAYERS - 1; l++) {
+//         PropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l + 1]);
+//     }
+// }
+
+
+
+
+
+
+// Updated:
+
+
+
+_global_ void PropagateLayerKernel(REAL* A, REAL* B, REAL* C, int ARows, int ACols, int BRows, int BCols, int CRows, int CCols) {
+    int Row = blockIdx.y * blockDim.y + threadIdx.y;
+    int Col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if ((Row < CRows) && (Col < CCols)) {
+        REAL CValue = 0;
+        for (int k = 0; k < ACols; ++k) {
+            CValue += A[Row * ACols + k] * B[k * BCols + Col];
         }
-        upperOutput[idx] = 1 / (1 + exp(-gain * sum));
+        C[Row * CCols + Col] = CValue;
     }
-} //prev. __global__  
+}
 
-
-
-// Modified PropagateLayer function to use CUDA
 void PropagateLayerCUDA(NET* Net, LAYER* Lower, LAYER* Upper) {
-    double *d_LowerOutput, *d_UpperWeights, *d_UpperOutput;
+    REAL *deviceLowerOutput, *deviceUpperWeight, *deviceUpperOutput;
+    int sizeLowerOutput = (Lower->Units + 1) * sizeof(REAL);
+    int sizeUpperWeight = (Upper->Units + 1) * (Lower->Units + 1) * sizeof(REAL);
+    int sizeUpperOutput = (Upper->Units + 1) * sizeof(REAL);
 
-    cudaMalloc(&d_LowerOutput, sizeof(double) * (Lower->Units + 1));
-    cudaMalloc(&d_UpperWeights, sizeof(double) * (Upper->Units + 1) * (Lower->Units + 1));
-    cudaMalloc(&d_UpperOutput, sizeof(double) * (Upper->Units + 1));
+    cudaMalloc(&deviceLowerOutput, sizeLowerOutput);
+    cudaMalloc(&deviceUpperWeight, sizeUpperWeight);
+    cudaMalloc(&deviceUpperOutput, sizeUpperOutput);
 
-    cudaMemcpy(d_LowerOutput, Lower->Output, sizeof(double) * (Lower->Units + 1), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_UpperWeights, Upper->Weight[0], sizeof(double) * (Upper->Units + 1) * (Lower->Units + 1), cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceLowerOutput, Lower->Output, sizeLowerOutput, cudaMemcpyHostToDevice);
+    cudaMemcpy(deviceUpperWeight, Upper->Weight[0], sizeUpperWeight, cudaMemcpyHostToDevice);
 
-    int blockSize = 256;
-    int numBlocks = (Upper->Units + blockSize - 1) / blockSize;
-    PropagateLayerKernel<<<numBlocks, blockSize>>>(d_LowerOutput, d_UpperWeights, d_UpperOutput, Lower->Units, Upper->Units, Net->Gain);
+    dim3 dimBlock(16, 16);
+    dim3 dimGrid((Upper->Units + dimBlock.x - 1) / dimBlock.x, (Lower->Units + dimBlock.y - 1) / dimBlock.y);
+    PropagateLayerKernel<<<dimGrid, dimBlock>>>(deviceLowerOutput, deviceUpperWeight, deviceUpperOutput, Lower->Units + 1, 1, Upper->Units + 1, Lower->Units + 1, Upper->Units + 1, 1);
 
-    cudaMemcpy(Upper->Output, d_UpperOutput, sizeof(double) * (Upper->Units + 1), cudaMemcpyDeviceToHost);
+    cudaMemcpy(Upper->Output, deviceUpperOutput, sizeUpperOutput, cudaMemcpyDeviceToHost);
 
-    cudaFree(d_LowerOutput);
-    cudaFree(d_UpperWeights);
-    cudaFree(d_UpperOutput);
-}
+    cudaFree(deviceLowerOutput);
+    cudaFree(deviceUpperWeight);
+    cudaFree(deviceUpperOutput);
 
-
-// Modified PropagateNet function to use the CUDA version of PropagateLayer
-void PropagateNetCUDA(NET* Net) {
-    for (int l = 0; l < NUM_LAYERS - 1; l++) {
-        PropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l + 1]);
+    // Apply the sigmoid function
+    for (int i = 1; i <= Upper->Units; i++) {
+        Upper->Output[i] = 1 / (1 + exp(-Net->Gain * Upper->Output[i]));
     }
 }
+
+
+
+
+
+
+
+
 
 
 /******************************************************************************
@@ -387,49 +448,128 @@ void ComputeOutputError(NET* Net, REAL* Target)
 }
 
 
-void BackpropagateLayer(NET* Net, LAYER* Upper, LAYER* Lower)
-{
-  INT  i,j;
-  REAL Out, Err;
+// void BackpropagateLayer(NET* Net, LAYER* Upper, LAYER* Lower)
+// {
+//   INT  i,j;
+//   REAL Out, Err;
 
-  for (i=1; i<=Lower->Units; i++) {
-    Out = Lower->Output[i];
-    Err = 0;
-    for (j=1; j<=Upper->Units; j++) {
-      Err += Upper->Weight[j][i] * Upper->Error[j];
+//   for (i=1; i<=Lower->Units; i++) {
+//     Out = Lower->Output[i];
+//     Err = 0;
+//     for (j=1; j<=Upper->Units; j++) {
+//       Err += Upper->Weight[j][i] * Upper->Error[j];
+//     }
+//     Lower->Error[i] = Net->Gain * Out * (1-Out) * Err;
+//   }
+// }
+
+
+// void BackpropagateNet(NET* Net)
+// {
+//   INT l;
+
+//   for (l=NUM_LAYERS-1; l>1; l--) {
+//     BackpropagateLayer(Net, Net->Layer[l], Net->Layer[l-1]);
+//   }
+// }
+
+
+// void AdjustWeights(NET* Net)
+// {
+//   INT  l,i,j;
+//   REAL Out, Err, dWeight;
+
+//   for (l=1; l<NUM_LAYERS; l++) {
+//     for (i=1; i<=Net->Layer[l]->Units; i++) {
+//       for (j=0; j<=Net->Layer[l-1]->Units; j++) {
+//         Out = Net->Layer[l-1]->Output[j];
+//         Err = Net->Layer[l]->Error[i];
+//         dWeight = Net->Layer[l]->dWeight[i][j];
+//         Net->Layer[l]->Weight[i][j] += Net->Eta * Err * Out + Net->Alpha * dWeight;
+//         Net->Layer[l]->dWeight[i][j] = Net->Eta * Err * Out;
+//       }
+//     }
+//   }
+// }
+
+
+
+//Optimized code
+
+typedef float REAL;
+typedef int INT;
+
+// Define your NET and LAYER structures here
+
+__global__ void BackpropagateLayerKernel(REAL* lowerOutput, REAL* upperWeights, REAL* upperError, REAL* lowerError, int lowerUnits, int upperUnits, REAL gain) {
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    if (idx < lowerUnits) {
+        REAL out = lowerOutput[idx];
+        REAL err = 0;
+        for (int j = 1; j <= upperUnits; j++) {
+            err += upperWeights[j * (lowerUnits + 1) + idx] * upperError[j];
+        }
+        lowerError[idx] = gain * out * (1 - out) * err;
     }
-    Lower->Error[i] = Net->Gain * Out * (1-Out) * Err;
-  }
 }
 
+void BackpropagateLayerCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput, REAL* d_upperWeights, REAL* d_upperError, REAL* d_lowerError) {
+    // Kernel launch parameters
+    int blockSize = 256;
+    int numBlocks = (Lower->Units + blockSize - 1) / blockSize;
+    BackpropagateLayerKernel<<<numBlocks, blockSize>>>(d_lowerOutput, d_upperWeights, d_upperError, d_lowerError, Lower->Units, Upper->Units, Net->Gain);
+    cudaDeviceSynchronize();  // Wait for the kernel to finish
 
-void BackpropagateNet(NET* Net)
-{
-  INT l;
-
-  for (l=NUM_LAYERS-1; l>1; l--) {
-    BackpropagateLayer(Net, Net->Layer[l], Net->Layer[l-1]);
-  }
+    // Copy the results back to CPU if needed
+    // ...
 }
 
-
-void AdjustWeights(NET* Net)
-{
-  INT  l,i,j;
-  REAL Out, Err, dWeight;
-
-  for (l=1; l<NUM_LAYERS; l++) {
-    for (i=1; i<=Net->Layer[l]->Units; i++) {
-      for (j=0; j<=Net->Layer[l-1]->Units; j++) {
-        Out = Net->Layer[l-1]->Output[j];
-        Err = Net->Layer[l]->Error[i];
-        dWeight = Net->Layer[l]->dWeight[i][j];
-        Net->Layer[l]->Weight[i][j] += Net->Eta * Err * Out + Net->Alpha * dWeight;
-        Net->Layer[l]->dWeight[i][j] = Net->Eta * Err * Out;
-      }
+__global__ void AdjustWeightsKernel(REAL* lowerOutput, REAL* upperError, REAL* weights, REAL* dWeights, int lowerUnits, int upperUnits, REAL eta, REAL alpha) {
+    int i = blockDim.x * blockIdx.x + threadIdx.x;
+    int j = blockDim.y * blockIdx.y + threadIdx.y;
+    if (i <= upperUnits && j <= lowerUnits) {
+        REAL Out = lowerOutput[j];
+        REAL Err = upperError[i];
+        REAL dWeight = dWeights[i * (lowerUnits + 1) + j];
+        weights[i * (lowerUnits + 1) + j] += eta * Err * Out + alpha * dWeight;
+        dWeights[i * (lowerUnits + 1) + j] = eta * Err * Out;
     }
-  }
 }
+
+void AdjustWeightsCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput, REAL* d_upperError, REAL* d_weights, REAL* d_dWeights) {
+    // Kernel launch parameters
+    int blockSize = 16;  // You may need to adjust the block size for your specific data size
+    dim3 gridSize((Upper->Units + blockSize - 1) / blockSize, (Lower->Units + blockSize - 1) / blockSize);
+    AdjustWeightsKernel<<<gridSize, dim3(blockSize, blockSize>>>(d_lowerOutput, d_upperError, d_weights, d_dWeights, Lower->Units, Upper->Units, Net->Eta, Net->Alpha);
+    cudaDeviceSynchronize();  // Wait for the kernel to finish
+
+    // Copy the updated weights and dWeights back to CPU if needed
+    // ...
+}
+
+void BackpropagateNetCUDA(NET* Net) {
+    for (int l = NUM_LAYERS - 1; l > 1; l--) {
+        BackpropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperWeights, d_upperError, d_lowerError */);
+    }
+}
+
+void AdjustWeightsNetCUDA(NET* Net) {
+    for (int l = 1; l < NUM_LAYERS; l++) {
+        AdjustWeightsCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperError, d_weights, d_dWeights */);
+    }
+}
+
+
+
+/////
+
+
+
+
+
+
+
+
 
 
 /******************************************************************************
