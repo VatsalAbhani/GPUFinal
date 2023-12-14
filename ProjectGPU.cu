@@ -616,6 +616,25 @@ int main()
   BOOL Stop;
   REAL MinTestError;
 
+
+float* d_lowerOutput;
+float* d_upperError;
+float* d_weights;
+float* d_dWeights;
+
+cudaMalloc((void**)&d_lowerOutput, sizeof(float) * numElements1);
+cudaMalloc((void**)&d_upperError, sizeof(float) * numElements2);
+cudaMalloc((void**)&d_weights, sizeof(float) * numElements3);
+cudaMalloc((void**)&d_dWeights, sizeof(float) * numElements4);
+
+// Copy data from host to device if necessary
+cudaMemcpy(d_lowerOutput, h_lowerOutput, sizeof(float) * numElements1, cudaMemcpyHostToDevice);
+cudaMemcpy(d_upperError, h_upperError, sizeof(float) * numElements2, cudaMemcpyHostToDevice);
+cudaMemcpy(d_weights, h_weights, sizeof(float) * numElements3, cudaMemcpyHostToDevice);
+cudaMemcpy(d_dWeights, h_dWeights, sizeof(float) * numElements4, cudaMemcpyHostToDevice); 
+
+
+
   InitializeRandoms();
   GenerateNetwork(&Net);
   RandomWeights(&Net);
