@@ -494,7 +494,10 @@ void AdjustWeightsCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput
     // Kernel launch parameters
     int blockSize = 16;  // You may need to adjust the block size for your specific data size
     dim3 gridSize((Upper->Units + blockSize - 1) / blockSize, (Lower->Units + blockSize - 1) / blockSize);
-    AdjustWeightsKernel<<<gridSize, dim3(blockSize, blockSize>>>(d_lowerOutput, d_upperError, d_weights, d_dWeights, Lower->Units, Upper->Units, Net->Eta, Net->Alpha));
+    
+    AdjustWeightsKernel<<<gridSize, dim3(blockSize, blockSize)>>>(d_lowerOutput, d_upperError, d_weights, d_dWeights, Lower->Units, Upper->Units, Net->Eta, Net->Alpha);
+
+
     cudaDeviceSynchronize();  // Wait for the kernel to finish
 
     // Copy the updated weights and dWeights back to CPU if needed
@@ -503,13 +506,15 @@ void AdjustWeightsCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput
 
 void BackpropagateNetCUDA(NET* Net) {
     for (int l = NUM_LAYERS - 1; l > 1; l--) {
-    BackpropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperWeights, d_upperError, d_lowerError */);
+    
+    BackpropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l - 1], d_lowerOutput, d_upperError, d_weights, d_dWeights);
+
     }
 }
 
 void AdjustWeightsNetCUDA(NET* Net) {
     for (int l = 1; l < NUM_LAYERS; l++) {
-        AdjustWeightsCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperError, d_weights, d_dWeights */);
+        AdjustWeightsCUDA(Net, Net->Layer[l], Net->Layer[l - 1], d_lowerOutput, d_upperError, d_weights, d_dWeights);
     }
 }
 
