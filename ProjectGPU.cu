@@ -536,7 +536,7 @@ void AdjustWeightsNetCUDA(NET* Net, REAL* d_lowerOutput, REAL* d_upperError, REA
  ******************************************************************************/
 
 
-void SimulateNet(NET* Net, REAL* Input, REAL* Output, REAL* Target, BOOL Training)
+void SimulateNet(NET* Net, REAL* Input, REAL* Output, REAL* Target, BOOL Training, REAL* d_lowerOutput, REAL* d_upperError, REAL* d_weights, REAL* d_dWeights)
 {
   SetInput(Net, Input);
   PropagateNetCUDA(Net);
