@@ -617,10 +617,10 @@ int main()
   REAL MinTestError;
 
 
-REAL d_lowerOutput;
-REAL d_upperError;
-REAL d_weights;
-REAL d_dWeights;
+REAL* d_lowerOutput;
+REA* d_upperError;
+REAL* d_weights;
+REAL* d_dWeights;
 
 // Define and initialize numElements1, numElements2, and numElements3
 int numElements1 = N + M;
