@@ -41,8 +41,8 @@ typedef struct {                     /* A NET:                                */
         LAYER*        OutputLayer;   /* - output layer                        */
         REAL          d_Alpha;         /* - momentum factor                     */
     __constant__ REAL d_Eta = Eta;         /* - learning rate                       */
-    __constant__ REAL d_Alpha = d_Alpha;
-    __constant__ REAL d_Gain = d_Gain;        /* - total net error                     */
+    __constant__ REAL d_Alpha = Alpha;
+    __constant__ REAL d_Gain = Gain;        /* - total net error                     */
 } NET;
 
 
