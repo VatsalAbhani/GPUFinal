@@ -624,8 +624,8 @@ int main()
   Stop = FALSE;
   MinTestError = MAX_REAL;
   do {
-    TrainNet(&Net, 10);
-    TestNet(&Net);
+    TrainNet(&Net, 10,d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
+    TestNet(&Net,d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
     if (TestError < MinTestError) {
       fprintf(f, " - saving Weights ...");
       MinTestError = TestError;
@@ -638,8 +638,8 @@ int main()
     }
   } while (NOT Stop);
 
-  TestNet(&Net);
-  EvaluateNet(&Net);
+  TestNet(&Net,d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
+  EvaluateNet(&Net,d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
 
   FinalizeApplication(&Net);
   return 0;
