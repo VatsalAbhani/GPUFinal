@@ -618,7 +618,7 @@ int main()
 
 
 REAL* d_lowerOutput;
-REA* d_upperError;
+REAL* d_upperError;
 REAL* d_weights;
 REAL* d_dWeights;
 
