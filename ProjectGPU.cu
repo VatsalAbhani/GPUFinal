@@ -448,116 +448,116 @@ void ComputeOutputError(NET* Net, REAL* Target)
 }
 
 
-// void BackpropagateLayer(NET* Net, LAYER* Upper, LAYER* Lower)
-// {
-//   INT  i,j;
-//   REAL Out, Err;
+void BackpropagateLayer(NET* Net, LAYER* Upper, LAYER* Lower)
+{
+  INT  i,j;
+  REAL Out, Err;
 
-//   for (i=1; i<=Lower->Units; i++) {
-//     Out = Lower->Output[i];
-//     Err = 0;
-//     for (j=1; j<=Upper->Units; j++) {
-//       Err += Upper->Weight[j][i] * Upper->Error[j];
-//     }
-//     Lower->Error[i] = Net->Gain * Out * (1-Out) * Err;
-//   }
-// }
-
-
-// void BackpropagateNet(NET* Net)
-// {
-//   INT l;
-
-//   for (l=NUM_LAYERS-1; l>1; l--) {
-//     BackpropagateLayer(Net, Net->Layer[l], Net->Layer[l-1]);
-//   }
-// }
+  for (i=1; i<=Lower->Units; i++) {
+    Out = Lower->Output[i];
+    Err = 0;
+    for (j=1; j<=Upper->Units; j++) {
+      Err += Upper->Weight[j][i] * Upper->Error[j];
+    }
+    Lower->Error[i] = Net->Gain * Out * (1-Out) * Err;
+  }
+}
 
 
-// void AdjustWeights(NET* Net)
-// {
-//   INT  l,i,j;
-//   REAL Out, Err, dWeight;
+void BackpropagateNet(NET* Net)
+{
+  INT l;
 
-//   for (l=1; l<NUM_LAYERS; l++) {
-//     for (i=1; i<=Net->Layer[l]->Units; i++) {
-//       for (j=0; j<=Net->Layer[l-1]->Units; j++) {
-//         Out = Net->Layer[l-1]->Output[j];
-//         Err = Net->Layer[l]->Error[i];
-//         dWeight = Net->Layer[l]->dWeight[i][j];
-//         Net->Layer[l]->Weight[i][j] += Net->Eta * Err * Out + Net->Alpha * dWeight;
-//         Net->Layer[l]->dWeight[i][j] = Net->Eta * Err * Out;
-//       }
-//     }
-//   }
-// }
+  for (l=NUM_LAYERS-1; l>1; l--) {
+    BackpropagateLayer(Net, Net->Layer[l], Net->Layer[l-1]);
+  }
+}
+
+
+void AdjustWeights(NET* Net)
+{
+  INT  l,i,j;
+  REAL Out, Err, dWeight;
+
+  for (l=1; l<NUM_LAYERS; l++) {
+    for (i=1; i<=Net->Layer[l]->Units; i++) {
+      for (j=0; j<=Net->Layer[l-1]->Units; j++) {
+        Out = Net->Layer[l-1]->Output[j];
+        Err = Net->Layer[l]->Error[i];
+        dWeight = Net->Layer[l]->dWeight[i][j];
+        Net->Layer[l]->Weight[i][j] += Net->Eta * Err * Out + Net->Alpha * dWeight;
+        Net->Layer[l]->dWeight[i][j] = Net->Eta * Err * Out;
+      }
+    }
+  }
+}
 
 
 
 //Optimized code
 
-typedef float REAL;
-typedef int INT;
+// typedef float REAL;
+// typedef int INT;
 
-// Define your NET and LAYER structures here
+// // Define your NET and LAYER structures here
 
-__global__ void BackpropagateLayerKernel(REAL* lowerOutput, REAL* upperWeights, REAL* upperError, REAL* lowerError, int lowerUnits, int upperUnits, REAL gain) {
-    int idx = blockDim.x * blockIdx.x + threadIdx.x;
-    if (idx < lowerUnits) {
-        REAL out = lowerOutput[idx];
-        REAL err = 0;
-        for (int j = 1; j <= upperUnits; j++) {
-            err += upperWeights[j * (lowerUnits + 1) + idx] * upperError[j];
-        }
-        lowerError[idx] = gain * out * (1 - out) * err;
-    }
-}
+// __global__ void BackpropagateLayerKernel(REAL* lowerOutput, REAL* upperWeights, REAL* upperError, REAL* lowerError, int lowerUnits, int upperUnits, REAL gain) {
+//     int idx = blockDim.x * blockIdx.x + threadIdx.x;
+//     if (idx < lowerUnits) {
+//         REAL out = lowerOutput[idx];
+//         REAL err = 0;
+//         for (int j = 1; j <= upperUnits; j++) {
+//             err += upperWeights[j * (lowerUnits + 1) + idx] * upperError[j];
+//         }
+//         lowerError[idx] = gain * out * (1 - out) * err;
+//     }
+// }
 
-void BackpropagateLayerCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput, REAL* d_upperWeights, REAL* d_upperError, REAL* d_lowerError) {
-    // Kernel launch parameters
-    int blockSize = 256;
-    int numBlocks = (Lower->Units + blockSize - 1) / blockSize;
-    BackpropagateLayerKernel<<<numBlocks, blockSize>>>(d_lowerOutput, d_upperWeights, d_upperError, d_lowerError, Lower->Units, Upper->Units, Net->Gain);
-    cudaDeviceSynchronize();  // Wait for the kernel to finish
+// void BackpropagateLayerCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput, REAL* d_upperWeights, REAL* d_upperError, REAL* d_lowerError) {
+//     // Kernel launch parameters
+//     int blockSize = 256;
+//     int numBlocks = (Lower->Units + blockSize - 1) / blockSize;
+//     BackpropagateLayerKernel<<<numBlocks, blockSize>>>(d_lowerOutput, d_upperWeights, d_upperError, d_lowerError, Lower->Units, Upper->Units, Net->Gain);
+//     cudaDeviceSynchronize();  // Wait for the kernel to finish
 
-    // Copy the results back to CPU if needed
-    // ...
-}
+//     // Copy the results back to CPU if needed
+//     // ...
+// }
 
-__global__ void AdjustWeightsKernel(REAL* lowerOutput, REAL* upperError, REAL* weights, REAL* dWeights, int lowerUnits, int upperUnits, REAL eta, REAL alpha) {
-    int i = blockDim.x * blockIdx.x + threadIdx.x;
-    int j = blockDim.y * blockIdx.y + threadIdx.y;
-    if (i <= upperUnits && j <= lowerUnits) {
-        REAL Out = lowerOutput[j];
-        REAL Err = upperError[i];
-        REAL dWeight = dWeights[i * (lowerUnits + 1) + j];
-        weights[i * (lowerUnits + 1) + j] += eta * Err * Out + alpha * dWeight;
-        dWeights[i * (lowerUnits + 1) + j] = eta * Err * Out;
-    }
-}
+// __global__ void AdjustWeightsKernel(REAL* lowerOutput, REAL* upperError, REAL* weights, REAL* dWeights, int lowerUnits, int upperUnits, REAL eta, REAL alpha) {
+//     int i = blockDim.x * blockIdx.x + threadIdx.x;
+//     int j = blockDim.y * blockIdx.y + threadIdx.y;
+//     if (i <= upperUnits && j <= lowerUnits) {
+//         REAL Out = lowerOutput[j];
+//         REAL Err = upperError[i];
+//         REAL dWeight = dWeights[i * (lowerUnits + 1) + j];
+//         weights[i * (lowerUnits + 1) + j] += eta * Err * Out + alpha * dWeight;
+//         dWeights[i * (lowerUnits + 1) + j] = eta * Err * Out;
+//     }
+// }
 
-void AdjustWeightsCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput, REAL* d_upperError, REAL* d_weights, REAL* d_dWeights) {
-    // Kernel launch parameters
-    int blockSize = 16;  // You may need to adjust the block size for your specific data size
-    dim3 gridSize((Upper->Units + blockSize - 1) / blockSize, (Lower->Units + blockSize - 1) / blockSize);
-    AdjustWeightsKernel<<<gridSize, dim3(blockSize, blockSize>>>(d_lowerOutput, d_upperError, d_weights, d_dWeights, Lower->Units, Upper->Units, Net->Eta, Net->Alpha);
-    cudaDeviceSynchronize();  // Wait for the kernel to finish
+// void AdjustWeightsCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput, REAL* d_upperError, REAL* d_weights, REAL* d_dWeights) {
+//     // Kernel launch parameters
+//     int blockSize = 16;  // You may need to adjust the block size for your specific data size
+//     dim3 gridSize((Upper->Units + blockSize - 1) / blockSize, (Lower->Units + blockSize - 1) / blockSize);
+//     AdjustWeightsKernel<<<gridSize, dim3(blockSize, blockSize>>>(d_lowerOutput, d_upperError, d_weights, d_dWeights, Lower->Units, Upper->Units, Net->Eta, Net->Alpha);
+//     cudaDeviceSynchronize();  // Wait for the kernel to finish
 
-    // Copy the updated weights and dWeights back to CPU if needed
-    // ...
-}
+//     // Copy the updated weights and dWeights back to CPU if needed
+//     // ...
+// }
 
-void BackpropagateNetCUDA(NET* Net) {
-    for (int l = NUM_LAYERS - 1; l > 1; l--) {
-        BackpropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperWeights, d_upperError, d_lowerError */);
-    }
-}
+// void BackpropagateNetCUDA(NET* Net) {
+//     for (int l = NUM_LAYERS - 1; l > 1; l--) {
+//         BackpropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperWeights, d_upperError, d_lowerError */);
+//     }
+// }
 
-void AdjustWeightsNetCUDA(NET* Net) {
-    for (int l = 1; l < NUM_LAYERS; l++) {
-        AdjustWeightsCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperError, d_weights, d_dWeights */);
-    }
-}
+// void AdjustWeightsNetCUDA(NET* Net) {
+//     for (int l = 1; l < NUM_LAYERS; l++) {
+//         AdjustWeightsCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperError, d_weights, d_dWeights */);
+//     }
+// }
 
 
 
