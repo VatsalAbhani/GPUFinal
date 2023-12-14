@@ -503,7 +503,7 @@ void AdjustWeightsCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput
 
 void BackpropagateNetCUDA(NET* Net) {
     for (int l = NUM_LAYERS - 1; l > 1; l--) {
-        BackpropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperWeights, d_upperError, d_lowerError */);
+    BackpropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l - 1], /* pass GPU pointers for d_lowerOutput, d_upperWeights, d_upperError, d_lowerError */);
     }
 }
 
