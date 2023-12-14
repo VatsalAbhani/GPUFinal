@@ -617,10 +617,10 @@ int main()
   REAL MinTestError;
 
 
-float* d_lowerOutput;
-float* d_upperError;
-float* d_weights;
-float* d_dWeights;
+REAL d_lowerOutput;
+REAL d_upperError;
+REAL d_weights;
+REAL d_dWeights;
 
 cudaMalloc((void**)&d_lowerOutput, sizeof(float) * numElements1);
 cudaMalloc((void**)&d_upperError, sizeof(float) * numElements2);
