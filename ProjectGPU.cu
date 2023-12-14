@@ -319,29 +319,73 @@ void RestoreWeights(NET* Net)
  ******************************************************************************/
 
 
-void PropagateLayer(NET* Net, LAYER* Lower, LAYER* Upper)
-{
-  INT  i,j;
-  REAL Sum;
+// void PropagateLayer(NET* Net, LAYER* Lower, LAYER* Upper)
+// {
+//   INT  i,j;
+//   REAL Sum;
 
-  for (i=1; i<=Upper->Units; i++) {
-    Sum = 0;
-    for (j=0; j<=Lower->Units; j++) {
-      Sum += Upper->Weight[i][j] * Lower->Output[j];
+//   for (i=1; i<=Upper->Units; i++) {
+//     Sum = 0;
+//     for (j=0; j<=Lower->Units; j++) {
+//       Sum += Upper->Weight[i][j] * Lower->Output[j];
+//     }
+//     Upper->Output[i] = 1 / (1 + exp(-Net->Gain * Sum));
+//   }
+// }
+
+
+// void PropagateNet(NET* Net)
+// {
+//   INT l;
+
+//   for (l=0; l<NUM_LAYERS-1; l++) {
+//     PropagateLayer(Net, Net->Layer[l], Net->Layer[l+1]);
+//   }
+// }
+
+
+// CUDA Kernel for PropagateLayer
+__global__ void PropagateLayerKernel(REAL* lowerOutput, REAL* upperWeights, REAL* upperOutput, int lowerUnits, int upperUnits, REAL gain) {
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    if (idx < upperUnits) {
+        REAL sum = 0;
+        for (int j = 0; j <= lowerUnits; j++) {
+            sum += upperWeights[idx * (lowerUnits + 1) + j] * lowerOutput[j];
+        }
+        upperOutput[idx] = 1 / (1 + exp(-gain * sum));
     }
-    Upper->Output[i] = 1 / (1 + exp(-Net->Gain * Sum));
-  }
+}
+
+// Modified PropagateLayer function to use CUDA
+void PropagateLayerCUDA(NET* Net, LAYER* Lower, LAYER* Upper) {
+    REAL *d_lowerOutput, *d_upperWeights, *d_upperOutput;
+    cudaMalloc(&d_lowerOutput, sizeof(REAL) * (Lower->Units + 1));
+    cudaMalloc(&d_upperWeights, sizeof(REAL) * (Upper->Units + 1) * (Lower->Units + 1));
+    cudaMalloc(&d_upperOutput, sizeof(REAL) * (Upper->Units + 1));
+    cudaMemcpy(d_lowerOutput, Lower->Output, sizeof(REAL) * (Lower->Units + 1), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_upperWeights, Upper->Weight[0], sizeof(REAL) * (Upper->Units + 1) * (Lower->Units + 1), cudaMemcpyHostToDevice);
+    int blockSize = 256;
+    int numBlocks = (Upper->Units + blockSize - 1) / blockSize;
+    PropagateLayerKernel<<<numBlocks, blockSize>>>(d_lowerOutput, d_upperWeights, d_upperOutput, Lower->Units, Upper->Units, Net->Gain);
+    cudaMemcpy(Upper->Output, d_upperOutput, sizeof(REAL) * (Upper->Units + 1), cudaMemcpyDeviceToHost);
+    cudaFree(d_lowerOutput);
+    cudaFree(d_upperWeights);
+    cudaFree(d_upperOsutput);
+}
+
+// Modified PropagateNet function to use the CUDA version of PropagateLayer
+void PropagateNetCUDA(NET* Net) {
+    for (int l = 0; l < NUM_LAYERS - 1; l++) {
+        PropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l + 1]);
+    }
 }
 
 
-void PropagateNet(NET* Net)
-{
-  INT l;
 
-  for (l=0; l<NUM_LAYERS-1; l++) {
-    PropagateLayer(Net, Net->Layer[l], Net->Layer[l+1]);
-  }
-}
+
+
+
+
 
 
 /******************************************************************************
