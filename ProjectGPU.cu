@@ -450,7 +450,7 @@ void ComputeOutputError(NET* Net, REAL* Target)
 
 //Optimized code
 
-typedef float REAL;
+//typedef float REAL;
 typedef int INT;
 
 // Define your NET and LAYER structures here
@@ -494,7 +494,7 @@ void AdjustWeightsCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput
     // Kernel launch parameters
     int blockSize = 16;  // You may need to adjust the block size for your specific data size
     dim3 gridSize((Upper->Units + blockSize - 1) / blockSize, (Lower->Units + blockSize - 1) / blockSize);
-    AdjustWeightsKernel<<<gridSize, dim3(blockSize, blockSize>>>(d_lowerOutput, d_upperError, d_weights, d_dWeights, Lower->Units, Upper->Units, Net->Eta, Net->Alpha);
+    AdjustWeightsKernel<<<gridSize, dim3(blockSize, blockSize>>>(d_lowerOutput, d_upperError, d_weights, d_dWeights, Lower->Units, Upper->Units, Net->Eta, Net->Alpha));
     cudaDeviceSynchronize();  // Wait for the kernel to finish
 
     // Copy the updated weights and dWeights back to CPU if needed
