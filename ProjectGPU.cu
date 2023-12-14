@@ -504,7 +504,7 @@ void AdjustWeightsCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput
     // ...
 }
 
-void BackpropagateNetCUDA(NET* Net) {
+void BackpropagateNetCUDA(NET* Net, REAL* d_lowerOutput, REAL* d_upperError, REAL* d_weights, REAL* d_dWeights) {
     for (int l = NUM_LAYERS - 1; l > 1; l--) {
     
     BackpropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l - 1], d_lowerOutput, d_upperError, d_weights, d_dWeights);
@@ -512,7 +512,7 @@ void BackpropagateNetCUDA(NET* Net) {
     }
 }
 
-void AdjustWeightsNetCUDA(NET* Net) {
+void AdjustWeightsNetCUDA(NET* Net, REAL* d_lowerOutput, REAL* d_upperError, REAL* d_weights, REAL* d_dWeights) {
     for (int l = 1; l < NUM_LAYERS; l++) {
         AdjustWeightsCUDA(Net, Net->Layer[l], Net->Layer[l - 1], d_lowerOutput, d_upperError, d_weights, d_dWeights);
     }
