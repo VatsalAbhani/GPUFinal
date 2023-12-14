@@ -628,6 +628,12 @@ int numElements2 = N + M;
 int numElements3 = (N + M) * 10;
 int numElements4 = (N + M) * 10;
 
+cudaMemcpyToSymbol(d_Eta, &Eta, sizeof(REAL));
+cudaMemcpyToSymbol(d_Alpha, &Alpha, sizeof(REAL));
+cudaMemcpyToSymbol(d_Gain, &Gain, sizeof(REAL));
+
+
+
 REAL* h_lowerOutput = (REAL*)malloc(sizeof(REAL) * numElements1);
 REAL* h_upperError = (REAL*)malloc(sizeof(REAL) * numElements1);
 REAL* h_weights = (REAL*)malloc(sizeof(REAL) * numElements1);
