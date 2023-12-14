@@ -550,7 +550,7 @@ void SimulateNet(NET* Net, REAL* Input, REAL* Output, REAL* Target, BOOL Trainin
 }
 
 
-void TrainNet(NET* Net, INT Epochs)
+void TrainNet(NET* Net, INT Epochs, REAL* d_lowerOutput, REAL* d_upperError, REAL* d_weights, REAL* d_dWeights)
 {
   INT  Year, n;
   REAL Output[M];
@@ -562,7 +562,7 @@ void TrainNet(NET* Net, INT Epochs)
 }
 
 
-void TestNet(NET* Net)
+void TestNet(NET* Net, REAL* d_lowerOutput, REAL* d_upperError, REAL* d_weights, REAL* d_dWeights)
 {
   INT  Year;
   REAL Output[M];
@@ -583,7 +583,7 @@ void TestNet(NET* Net)
 }
 
 
-void EvaluateNet(NET* Net)
+void EvaluateNet(NET* Net, REAL* d_lowerOutput, REAL* d_upperError, REAL* d_weights, REAL* d_dWeights)
 {
   INT  Year;
   REAL Output [M];
