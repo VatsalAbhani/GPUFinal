@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-
+#include <cuda_runtime.h>
 
 
 typedef int           BOOL;
@@ -39,13 +39,11 @@ typedef struct {                     /* A NET:                                */
         LAYER**       Layer;         /* - layers of this net                  */
         LAYER*        InputLayer;    /* - input layer                         */
         LAYER*        OutputLayer;   /* - output layer                        */
-        REAL          d_Alpha;         /* - momentum factor                     */
-     REAL   Eta;         /* - learning rate                       */
-     REAL   Alpha;
-     REAL   Gain;        /* - total net error                     */
+        REAL          Alpha;         /* - momentum factor                     */
+        REAL          Eta;           /* - learning rate                       */
+        REAL          Gain;          /* - gain of sigmoid function            */
+        REAL          Error;         /* - total net error                     */
 } NET;
-
-
 
 
 /******************************************************************************
@@ -181,7 +179,7 @@ void InitializeApplication(NET* Net)
   INT  Year, i;
   REAL Out, Err;
 
-  Net->d_Alpha = 0.5;
+  Net->Alpha = 0.5;
   Net->Eta   = 0.05;
   Net->Gain  = 1;
 
@@ -244,7 +242,7 @@ void GenerateNetwork(NET* Net)
   }
   Net->InputLayer  = Net->Layer[0];
   Net->OutputLayer = Net->Layer[NUM_LAYERS - 1];
-  Net->d_Alpha       = 0.9;
+  Net->Alpha       = 0.9;
   Net->Eta         = 0.25;
   Net->Gain        = 1;
 }
@@ -342,7 +340,6 @@ __global__ void PropagateLayerKernel(double *lowerOutput, double *upperWeights, 
 
 // Modified PropagateLayer function to use CUDA
 void PropagateLayerCUDA(NET* Net, LAYER* Lower, LAYER* Upper) {
-    
     REAL *d_LowerOutput, *d_UpperWeights, *d_UpperOutput;
 
     cudaMalloc(&d_LowerOutput, sizeof(double) * (Lower->Units + 1));
@@ -442,7 +439,7 @@ void ComputeOutputError(NET* Net, REAL* Target)
 //         Out = Net->Layer[l-1]->Output[j];
 //         Err = Net->Layer[l]->Error[i];
 //         dWeight = Net->Layer[l]->dWeight[i][j];
-//         Net->Layer[l]->Weight[i][j] += Net->Eta * Err * Out + Net->d_Alpha * dWeight;
+//         Net->Layer[l]->Weight[i][j] += Net->Eta * Err * Out + Net->Alpha * dWeight;
 //         Net->Layer[l]->dWeight[i][j] = Net->Eta * Err * Out;
 //       }
 //     }
@@ -481,14 +478,14 @@ void BackpropagateLayerCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerO
     // ...
 }
 
-__global__ void AdjustWeightsKernel(REAL* lowerOutput, REAL* upperError, REAL* weights, REAL* dWeights, int lowerUnits, int upperUnits, REAL eta, REAL d_alpha) {
+__global__ void AdjustWeightsKernel(REAL* lowerOutput, REAL* upperError, REAL* weights, REAL* dWeights, int lowerUnits, int upperUnits, REAL eta, REAL alpha) {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
     int j = blockDim.y * blockIdx.y + threadIdx.y;
     if (i <= upperUnits && j <= lowerUnits) {
         REAL Out = lowerOutput[j];
         REAL Err = upperError[i];
         REAL dWeight = dWeights[i * (lowerUnits + 1) + j];
-        weights[i * (lowerUnits + 1) + j] += eta * Err * Out + d_alpha * dWeight;
+        weights[i * (lowerUnits + 1) + j] += eta * Err * Out + alpha * dWeight;
         dWeights[i * (lowerUnits + 1) + j] = eta * Err * Out;
     }
 }
@@ -498,7 +495,7 @@ void AdjustWeightsCUDA(NET* Net, LAYER* Upper, LAYER* Lower, REAL* d_lowerOutput
     int blockSize = 16;  // You may need to adjust the block size for your specific data size
     dim3 gridSize((Upper->Units + blockSize - 1) / blockSize, (Lower->Units + blockSize - 1) / blockSize);
     
-    AdjustWeightsKernel<<<gridSize, dim3(blockSize, blockSize)>>>(d_lowerOutput, d_upperError, d_weights, d_dWeights, Lower->Units, Upper->Units, Net->Eta, Net->d_Alpha);
+    AdjustWeightsKernel<<<gridSize, dim3(blockSize, blockSize)>>>(d_lowerOutput, d_upperError, d_weights, d_dWeights, Lower->Units, Upper->Units, Net->Eta, Net->Alpha);
 
 
     cudaDeviceSynchronize();  // Wait for the kernel to finish
@@ -630,9 +627,6 @@ int numElements1 = N + M;
 int numElements2 = N + M;
 int numElements3 = (N + M) * 10;
 int numElements4 = (N + M) * 10;
-
-
-
 
 REAL* h_lowerOutput = (REAL*)malloc(sizeof(REAL) * numElements1);
 REAL* h_upperError = (REAL*)malloc(sizeof(REAL) * numElements1);
