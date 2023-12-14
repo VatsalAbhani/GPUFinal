@@ -557,7 +557,7 @@ void TrainNet(NET* Net, INT Epochs)
 
   for (n=0; n<Epochs*TRAIN_YEARS; n++) {
     Year = RandomEqualINT(TRAIN_LWB, TRAIN_UPB);
-    SimulateNet(Net, &(Sunspots[Year-N]), Output, &(Sunspots[Year]), TRUE);
+    SimulateNet(Net, &(Sunspots[Year-N]), Output, &(Sunspots[Year]), TRUE, d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
   }
 }
 
@@ -569,12 +569,12 @@ void TestNet(NET* Net)
 
   TrainError = 0;
   for (Year=TRAIN_LWB; Year<=TRAIN_UPB; Year++) {
-    SimulateNet(Net, &(Sunspots[Year-N]), Output, &(Sunspots[Year]), FALSE);
+    SimulateNet(Net, &(Sunspots[Year-N]), Output, &(Sunspots[Year]), FALSE, d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
     TrainError += Net->Error;
   }
   TestError = 0;
   for (Year=TEST_LWB; Year<=TEST_UPB; Year++) {
-    SimulateNet(Net, &(Sunspots[Year-N]), Output, &(Sunspots[Year]), FALSE);
+    SimulateNet(Net, &(Sunspots[Year-N]), Output, &(Sunspots[Year]), FALSE,d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
     TestError += Net->Error;
   }
   fprintf(f, "\nNMSE is %0.3f on Training Set and %0.3f on Test Set",
@@ -593,8 +593,8 @@ void EvaluateNet(NET* Net)
   fprintf(f, "Year    Sunspots    Open-Loop Prediction    Closed-Loop Prediction\n");
   fprintf(f, "\n");
   for (Year=EVAL_LWB; Year<=EVAL_UPB; Year++) {
-    SimulateNet(Net, &(Sunspots [Year-N]), Output,  &(Sunspots [Year]), FALSE);
-    SimulateNet(Net, &(Sunspots_[Year-N]), Output_, &(Sunspots_[Year]), FALSE);
+    SimulateNet(Net, &(Sunspots [Year-N]), Output,  &(Sunspots [Year]), FALSE, d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
+    SimulateNet(Net, &(Sunspots_[Year-N]), Output_, &(Sunspots_[Year]), FALSE, d_lowerOutput, d_upperError,  d_weights,  d_dWeights);
     Sunspots_[Year] = Output_[0];
     fprintf(f, "%d       %0.3f                   %0.3f                     %0.3f\n",
                FIRST_YEAR + Year,
