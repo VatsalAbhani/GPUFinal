@@ -323,49 +323,39 @@ void RestoreWeights(NET* Net)
 
 
 // CUDA Kernel for PropagateLayer
-__global__ void PropagateLayerKernel(REAL* lowerOutput, REAL* upperWeights, REAL* upperOutput, int lowerUnits, int upperUnits, REAL gain) {
-    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+__device__ void PropagateLayerKernel(double *lowerOutput, double *upperWeights, double *upperOutput, int lowerUnits, int upperUnits, double gain) {
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < upperUnits) {
-        REAL sum = 0;
+        double sum = 0.0;
         for (int j = 0; j <= lowerUnits; j++) {
             sum += upperWeights[idx * (lowerUnits + 1) + j] * lowerOutput[j];
         }
-        upperOutput[idx + 1] = 1 / (1 + exp(-gain * sum)); // +1 because of bias unit
+        upperOutput[idx] = 1 / (1 + exp(-gain * sum));
     }
-}
+} //prev. __global__  
+
 
 
 // Modified PropagateLayer function to use CUDA
 void PropagateLayerCUDA(NET* Net, LAYER* Lower, LAYER* Upper) {
-    REAL *d_lowerOutput, *d_upperWeights, *d_upperOutput;
-    size_t lowerOutputSize = sizeof(REAL) * (Lower->Units + 1);
-    size_t upperWeightsSize = sizeof(REAL) * (Upper->Units + 1) * (Lower->Units + 1);
-    size_t upperOutputSize = sizeof(REAL) * (Upper->Units + 1);
+    double *d_LowerOutput, *d_UpperWeights, *d_UpperOutput;
 
-    cudaMalloc(&d_lowerOutput, lowerOutputSize);
-    cudaMalloc(&d_upperWeights, upperWeightsSize);
-    cudaMalloc(&d_upperOutput, upperOutputSize);
+    cudaMalloc(&d_LowerOutput, sizeof(double) * (Lower->Units + 1));
+    cudaMalloc(&d_UpperWeights, sizeof(double) * (Upper->Units + 1) * (Lower->Units + 1));
+    cudaMalloc(&d_UpperOutput, sizeof(double) * (Upper->Units + 1));
 
-    cudaMemcpy(d_lowerOutput, Lower->Output, lowerOutputSize, cudaMemcpyHostToDevice);
-
-    // Flatten the 2D weight array for copying
-    REAL* flatUpperWeights = (REAL*)malloc(upperWeightsSize);
-    for (int i = 1; i <= Upper->Units; i++) {
-        memcpy(flatUpperWeights + (i-1) * (Lower->Units + 1), Upper->Weight[i], sizeof(REAL) * (Lower->Units + 1));
-    }
-
-    cudaMemcpy(d_upperWeights, flatUpperWeights, upperWeightsSize, cudaMemcpyHostToDevice);
-    free(flatUpperWeights);
+    cudaMemcpy(d_LowerOutput, Lower->Output, sizeof(double) * (Lower->Units + 1), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_UpperWeights, Upper->Weight[0], sizeof(double) * (Upper->Units + 1) * (Lower->Units + 1), cudaMemcpyHostToDevice);
 
     int blockSize = 256;
     int numBlocks = (Upper->Units + blockSize - 1) / blockSize;
-    PropagateLayerKernel<<<numBlocks, blockSize>>>(d_lowerOutput, d_upperWeights, d_upperOutput, Lower->Units, Upper->Units, Net->Gain);
+    PropagateLayerKernel<<<numBlocks, blockSize>>>(d_LowerOutput, d_UpperWeights, d_UpperOutput, Lower->Units, Upper->Units, Net->Gain);
 
-    cudaMemcpy(Upper->Output + 1, d_upperOutput + 1, sizeof(REAL) * Upper->Units, cudaMemcpyDeviceToHost); // +1 to skip bias unit
+    cudaMemcpy(Upper->Output, d_UpperOutput, sizeof(double) * (Upper->Units + 1), cudaMemcpyDeviceToHost);
 
-    cudaFree(d_lowerOutput);
-    cudaFree(d_upperWeights);
-    cudaFree(d_upperOutput);
+    cudaFree(d_LowerOutput);
+    cudaFree(d_UpperWeights);
+    cudaFree(d_UpperOutput);
 }
 
 
@@ -375,14 +365,6 @@ void PropagateNetCUDA(NET* Net) {
         PropagateLayerCUDA(Net, Net->Layer[l], Net->Layer[l + 1]);
     }
 }
-
-
-
-
-
-
-
-
 
 
 /******************************************************************************
