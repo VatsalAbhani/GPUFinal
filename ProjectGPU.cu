@@ -622,6 +622,13 @@ REAL d_upperError;
 REAL d_weights;
 REAL d_dWeights;
 
+// Define and initialize numElements1, numElements2, and numElements3
+int numElements1 = N + M;
+int numElements2 = N + M;
+int numElements3 = (N + M) * 10;
+int numElements3 = (N + M) * 10;
+
+
 cudaMalloc((void**)&d_lowerOutput, sizeof(float) * numElements1);
 cudaMalloc((void**)&d_upperError, sizeof(float) * numElements2);
 cudaMalloc((void**)&d_weights, sizeof(float) * numElements3);
